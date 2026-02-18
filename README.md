@@ -5,19 +5,27 @@ The `SetObjectIntegrity` tool is a command-line utility designed to set integrit
 
 ## Usage
 ```
-SetObjectIntegrity.exe <ObjectType> <ObjectPath> <IntegrityLevel> <enable|disable> [inheritance]
+SetObjectIntegrity.exe /types
+SetObjectIntegrity.exe <ObjectType> <ObjectPath> <IntegrityLevel> [inheritance]
 ```
 
 ### Parameters
 - **ObjectType**: Specifies the type of object to modify. Valid options are:
-  - `file`: File or directory (SE_FILE_OBJECT)
-  - `registry`: Registry key (SE_REGISTRY_KEY)
-  - `service`: Windows service (SE_SERVICE)
-  - `printer`: Printer (SE_PRINTER)
-  - `kernel`: Kernel object (SE_KERNEL_OBJECT)
-  - `window`: Window station/desktop (SE_WINDOW_OBJECT)
-  - `ds`: Directory service object (SE_DS_OBJECT)
-
+  - `0`:SE_UNKNOWN_OBJECT_TYPE
+  - `1`:SE_FILE_OBJECT
+  - `2`:SE_SERVICE
+  - `3`:SE_PRINTER
+  - `4`:SE_REGISTRY_KEY
+  - `5`:SE_LMSHARE
+  - `6`:SE_KERNEL_OBJECT
+  - `7`:SE_WINDOW_OBJECT
+  - `8`:SE_DS_OBJECT
+  - `9`:SE_DS_OBJECT_ALL
+  - `10`:SE_PROVIDER_DEFINED_OBJECTI
+  - `11`:SE_WMIGUID_OBJECT
+  - `12`:SE_REGISTRY_WOW64_32KEY
+  - `13`:SE_REGISTRY_WOW64_64KEY
+	- 
 - **ObjectPath**: The path to the object.^[3]^ For example:
   - For files: `C:\Temp\test.txt`
   - For registry keys: `CURRENT_USER\Software\MyApp`
@@ -30,19 +38,17 @@ SetObjectIntegrity.exe <ObjectType> <ObjectPath> <IntegrityLevel> <enable|disabl
   - `S-1-16-12288` (High)
   - `S-1-16-16384` (System)
 
-- **enable|disable**: Determines whether to enable or disable the integrity level.^[5]^
-
 - **inheritance (optional)**: Specifies how the integrity level should be inherited by child objects.^[6]^ Valid options are:
-  - `none`: No inheritance.^[7]^
-  - `container`: Container inheritance.
-  - `object`: Object inheritance.^[8]^
-  - `both`: Both container and object inheritance.^[9]^
+  - `0`: No inheritance.^[7]^
+  - `1`: Object inheritance.^[8]^
+  - `2`: Container inheritance.
+  - `3`: Both container and object inheritance.^[9]^
 
 ### Examples
 ```
-SetObjectIntegrity.exe file C:\Temp\test.txt S-1-16-4096 enable none
-SetObjectIntegrity.exe registry CURRENT_USER\Software\MyApp S-1-16-8192 disable container
-SetObjectIntegrity.exe service MyService S-1-16-12288 enable both
+SetObjectIntegrity.exe 1 C:\DirectoryName\FileName.dat S-1-16-4096 0
+SetObjectIntegrity.exe 4 CLASSES_ROOT\SomePath S-1-16-8192 3
+SetObjectIntegrity.exe 2 ServiceName S-1-16-12288 3
 ```
 
 ## Integrity Levels
