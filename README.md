@@ -25,7 +25,7 @@ SetObjectIntegrity.exe <ObjectType> <ObjectPath> <IntegrityLevel> [inheritance]
   - `11`:SE_WMIGUID_OBJECT
   - `12`:SE_REGISTRY_WOW64_32KEY
   - `13`:SE_REGISTRY_WOW64_64KEY
-	- 
+
 - **ObjectPath**: The path to the object.^[3]^ For example:
   - For files: `C:\Temp\test.txt`
   - For registry keys: `CURRENT_USER\Software\MyApp`
