@@ -132,6 +132,7 @@ int wmain(int argc, wchar_t* argv[]) {
 			L"\n12:SE_REGISTRY_WOW64_32KEY:\nIndicates an object for a registry entry under WOW64.\n"
 			L"\n13:SE_REGISTRY_WOW64_64KEY\n"
 		);
+		return 0;
 	}
 	else {
 		wprintf(
@@ -169,6 +170,6 @@ int wmain(int argc, wchar_t* argv[]) {
 			L"  win_objects_il set 4 CURRENT_USER\\Software\\test LW\n"
 			L"  win_objects_il get 2 Spooler\n"
 		);
-		return 1;
+		return 0;
 	}
 }
