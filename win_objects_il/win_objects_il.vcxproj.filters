@@ -15,10 +15,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Main.c">
+    <ClCompile Include="win_objects_il.c">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="SetObjectIntegrity.c">
+    <ClCompile Include="Startup.c">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

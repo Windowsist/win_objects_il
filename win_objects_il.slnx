@@ -3,5 +3,5 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="SetObjectIntegrity/SetObjectIntegrity.vcxproj" Id="48f7b8cc-67f4-41f1-a194-40b802b7750d" />
+  <Project Path="win_objects_il/win_objects_il.vcxproj" Id="41eaeb74-f488-4437-bb14-bcd412916adf" />
 </Solution>
