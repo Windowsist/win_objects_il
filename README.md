@@ -1,7 +1,7 @@
 # win_objects_il
 
 ## Overview
-The `win_objects_il` tool is a command-line utility designed to set integrity levels on various Windows objects, such as files, registry keys, services, printers, kernel objects, windows, and directory service objects.^[1]^ This tool allows administrators to control the security and access permissions of these objects by specifying their integrity levels and inheritance properties.^[2]^
+The `win_objects_il` tool is a command-line utility designed to set integrity levels on various Windows objects, such as files, registry keys, services, printers, kernel objects, windows, and directory service objects. This tool allows administrators to control the security and access permissions of these objects by specifying their integrity levels and inheritance properties.
 
 ## Usage
 ```
