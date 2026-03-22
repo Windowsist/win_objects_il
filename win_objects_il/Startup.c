@@ -1,11 +1,11 @@
 #include "pch.h"
+#include <corecrt_startup.h>
 
 int wmain(int argc, wchar_t* argv[]);
 
-VOID Startup() {
-	int argc;
-	LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-	//int argc = __argc;
-	//int argv = __argv;
-	ExitProcess(wmain(argc, argv));
+DWORD Startup(LPVOID lpParameter) {
+	_configure_wide_argv(_crt_argv_unexpanded_arguments);
+	int result = wmain(__argc, __wargv);
+	ExitProcess(result);
+	return result;
 }

@@ -1,121 +1,182 @@
 ﻿#include "pch.h"
 
-const wchar_t* il_levels[] = {
-	L"LW",
-	L"ME",
-	L"MP",
-	L"HI",
-	L"SI",
-};
-
-static int check_il_sddl(const wchar_t* input) {
-	for (int i = 0; i < sizeof(il_levels) / sizeof(il_levels[0]); ++i) {
-		if (_wcsicmp(input, il_levels[i]) == 0) {
-			return 1;
-		}
+static void PrintLastError(LPCWSTR context)
+{
+	DWORD err = GetLastError();
+	LPWSTR msg;
+	DWORD len = FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_ALLOCATE_BUFFER,
+		NULL, err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPWSTR)&msg, 0, NULL);
+	if (len)
+	{
+		wprintf(L"%ls (%lu) : %ls", context, err, msg);
+		LocalFree(msg);
 	}
-	return 0;
+	else wprintf(L"%ls (%lu)\n", context, err);
 }
 
-const wchar_t* inherit[] = {
-	L"",
-	L"OI",
-	L"CI",
-	L"OICI",
-};
-
-static int check_inherit(const wchar_t* input) {
-	for (int i = 0; i < sizeof(inherit) / sizeof(inherit[0]); ++i) {
-		if (_wcsicmp(input, inherit[i]) == 0) {
-			return 1;
-		}
-	}
-	return 0;
-}
-int QueryObjectIL(LPCWSTR name, DWORD objType) {
+static int QueryObjectIL(LPCWSTR name, DWORD objType)
+{
 	PSECURITY_DESCRIPTOR pSD = NULL;
-	DWORD result = GetNamedSecurityInfoW(
-		name, (SE_OBJECT_TYPE)objType, LABEL_SECURITY_INFORMATION,
-		NULL, NULL, NULL, NULL, &pSD);
-	if (result != ERROR_SUCCESS) {
-		wprintf(L"GetNamedSecurityInfoW failed: %lu\n", result);
-		return 1;
-	}
-	PACL pSacl = NULL;
-	BOOL saclPresent = FALSE, saclDefaulted = FALSE;
-	if (!GetSecurityDescriptorSacl(pSD, &saclPresent, &pSacl, &saclDefaulted) || !saclPresent || !pSacl) {
-		wprintf(L"No SACL on this object.\n");
-	}
-	else {
-		BOOL ilPresent = FALSE;
-		for (DWORD i = 0; i < pSacl->AceCount; ++i) {
-			LPVOID pAce = NULL;
-			if (GetAce(pSacl, i, &pAce)) {
-				ACE_HEADER* header = (ACE_HEADER*)pAce;
-				if (header->AceType == SYSTEM_MANDATORY_LABEL_ACE_TYPE) {
-					SYSTEM_MANDATORY_LABEL_ACE* mlAce = (SYSTEM_MANDATORY_LABEL_ACE*)pAce;
-					DWORD il = *GetSidSubAuthority(&mlAce->SidStart,
-						(*GetSidSubAuthorityCount(&mlAce->SidStart)) - 1);
-					wprintf(L"Integrity Level RID: 0x%04lX\n", il);
-					ilPresent = TRUE;
-				}
-			}
-		}
-		if (!ilPresent)
+	{
+		DWORD result = GetNamedSecurityInfoW(
+			name, (SE_OBJECT_TYPE)objType, LABEL_SECURITY_INFORMATION,
+			NULL, NULL, NULL, NULL, &pSD);
+		if (result)
 		{
-			wprintf(L"No Integrity Level on this object.\n");
+			SetLastError(result);
+			PrintLastError(L"GetNamedSecurityInfoW failed");
+			if (pSD)LocalFree(pSD);
+			return 1;
 		}
+		//end DWORD result;
 	}
-	LocalFree(pSD);
-	return 0;
-}
-int SetObjectIL(LPCWSTR name, DWORD objType, const wchar_t* ilShort, const wchar_t* inherit) {
-	if (!check_il_sddl(ilShort)) {
-		wprintf(L"Invalid IL: %lS\n", ilShort);
-		return 1;
+	{
+		BYTE ilPresent;
+		{
+			PACL pSacl;
+			{
+				BOOL saclPresent, saclDefaulted;
+				if (!GetSecurityDescriptorSacl(pSD, &saclPresent, &pSacl, &saclDefaulted))
+				{
+					PrintLastError(L"GetSecurityDescriptorSacl failed");
+					if (pSD)LocalFree(pSD);
+					return 1;
+				}
+				if (!saclPresent || !pSacl)
+				{
+					_putws(L"No SACL present on this object.");
+					if (pSD)LocalFree(pSD);
+					return 1;
+				}
+				//end BOOL saclPresent, saclDefaulted;
+			}
+			ilPresent = FALSE;
+			for (DWORD i = 0; i < pSacl->AceCount; ++i)
+			{
+				LPVOID pAce;
+				if (!GetAce(pSacl, i, &pAce))continue;
+				if (((ACE_HEADER*)pAce)->AceType != SYSTEM_MANDATORY_LABEL_ACE_TYPE)continue;
+				wprintf(L"Integrity Level RID: 0x%04lX,Flags: 0x%01lX\n",
+					*GetSidSubAuthority(&((SYSTEM_MANDATORY_LABEL_ACE*)pAce)->SidStart, (*GetSidSubAuthorityCount(&((SYSTEM_MANDATORY_LABEL_ACE*)pAce)->SidStart)) - 1),
+					(((ACE_HEADER*)pAce)->AceFlags));
+				ilPresent = TRUE;
+			}
+			//end PACL pSacl;
+		}
+		if (!ilPresent)_putws(L"No Integrity Level on this object.");
+		//end BYTE ilPresent;
 	}
-	if (!check_inherit(inherit)) {
-		wprintf(L"Invalid inheritance: %lS\n", inherit);
-		return 1;
-	}
-	wchar_t sddl[128];
-	swprintf(sddl, 128, L"S:(ML;%lS;NW;;;%.2lS)", inherit, ilShort);
-	PSECURITY_DESCRIPTOR pSD = NULL;
-	PACL pSacl = NULL;
-	if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl, SDDL_REVISION_1, &pSD, NULL)) {
-		wprintf(L"ConvertStringSecurityDescriptorToSecurityDescriptorW failed: %lu\n", GetLastError());
-		return 1;
-	}
-	BOOL saclPresent, saclDefaulted;
-	if (!GetSecurityDescriptorSacl(pSD, &saclPresent, &pSacl, &saclDefaulted) || !saclPresent || !pSacl) {
-		wprintf(L"Could not get SACL from SDDL.\n");
-		LocalFree(pSD);
-		return 1;
-	}
-	DWORD result = SetNamedSecurityInfoW(
-		(LPWSTR)name, (SE_OBJECT_TYPE)objType, LABEL_SECURITY_INFORMATION,
-		NULL, NULL, NULL, pSacl);
-	LocalFree(pSD);
-	if (result != ERROR_SUCCESS) {
-		wprintf(L"SetNamedSecurityInfoW failed: %lu\n", result);
-		return 1;
-	}
-	wprintf(L"Set object IL success: %lS, inherit: %lS\n", ilShort, inherit);
+	if (pSD)LocalFree(pSD);
 	return 0;
 }
 
-int wmain(int argc, wchar_t* argv[]) {
-	if (argc == 4 && _wcsicmp(argv[1], L"get") == 0) {
+static int SetObjectIL(LPWSTR name, DWORD objType, const DWORD ilRid, const BYTE aceFlags)
+{
+	// 创建标签权威 SID (S-1-16-<RID>)
+	{
+		PACL pAcl;
+		{
+			PSID pLabelSid;
+			{
+				SID_IDENTIFIER_AUTHORITY labelAuthority = SECURITY_MANDATORY_LABEL_AUTHORITY;
+				if (!AllocateAndInitializeSid(&labelAuthority, 1, ilRid, 0, 0, 0, 0, 0, 0, 0, &pLabelSid))
+				{
+					PrintLastError(L"AllocateAndInitializeSid failed");
+					return 1;
+				}
+				//end SID_IDENTIFIER_AUTHORITY labelAuthority;
+			}
+			// 计算 ACE 大小并创建 ACL
+			{
+				DWORD aclSize = sizeof(ACL) + sizeof(SYSTEM_MANDATORY_LABEL_ACE) - sizeof(DWORD) + GetLengthSid(pLabelSid);
+				pAcl = (PACL)LocalAlloc(LMEM_FIXED, aclSize);
+				if (!pAcl)
+				{
+					PrintLastError(L"LocalAlloc failed for ACL");
+					FreeSid(pLabelSid);
+					return 1;
+				}
+				// 初始化 ACL
+				if (!InitializeAcl(pAcl, aclSize, ACL_REVISION))
+				{
+					LocalFree(pAcl);
+					FreeSid(pLabelSid);
+					PrintLastError(L"InitializeAcl failed");
+					return 1;
+				}
+				//end DWORD aclSize
+			}
+
+			// 添加 SYSTEM_MANDATORY_LABEL_ACE
+			// 权限固定为 NW (No Write Up)
+			if (!AddMandatoryAce(pAcl, ACL_REVISION, aceFlags,
+				SYSTEM_MANDATORY_LABEL_NO_WRITE_UP, pLabelSid))
+			{
+				LocalFree(pAcl);
+				FreeSid(pLabelSid);
+				PrintLastError(L"AddMandatoryAce failed");
+				return 1;
+			}
+			FreeSid(pLabelSid);
+			//end PSID pLabelSid;
+		}
+
+		// 初始化 SECURITY_DESCRIPTOR
+		{
+			SECURITY_DESCRIPTOR sd;
+			if (!InitializeSecurityDescriptor(&sd, SECURITY_DESCRIPTOR_REVISION))
+			{
+				PrintLastError(L"InitializeSecurityDescriptor failed");
+				return 1;
+			}
+
+			// 设置 SACL 到安全描述符
+			if (!SetSecurityDescriptorSacl(&sd, TRUE, pAcl, FALSE))
+			{
+				LocalFree(pAcl);
+				PrintLastError(L"SetSecurityDescriptorSacl failed");
+				return 1;
+			}
+			//end SECURITY_DESCRIPTOR sd;
+		}
+
+		// 应用安全描述符到对象
+		{
+			DWORD result = SetNamedSecurityInfoW(
+				name,
+				(SE_OBJECT_TYPE)objType,
+				LABEL_SECURITY_INFORMATION,
+				NULL, NULL, NULL, pAcl);
+
+			if (result)
+			{
+				SetLastError(result);
+				PrintLastError(L"SetNamedSecurityInfoW failed");
+				return 1;
+			}
+			//end DWORD result;
+		}
+		// 清理资源
+		LocalFree(pAcl);
+		//end PACL pAcl;
+	}
+	wprintf(L"Set object IL success: 0x%04lX, inherit: 0x%01lX\n", ilRid, aceFlags);
+	return 0;
+}
+
+int wmain(int argc, wchar_t* argv[])
+{
+	_setmode(_fileno(stdout), _O_U16TEXT);
+	_setmode(_fileno(stdin), _O_U16TEXT);
+	_setmode(_fileno(stderr), _O_U16TEXT);
+	if (argc == 4 && _wcsicmp(argv[1], L"get") == 0)
 		return QueryObjectIL(argv[3], wcstoul(argv[2], NULL, 0));
-	}
-	else if (argc == 5 && _wcsicmp(argv[1], L"set") == 0) {
-		return SetObjectIL(argv[3], wcstoul(argv[2], NULL, 0), argv[4], L"");
-	}
-	else if (argc == 6 && _wcsicmp(argv[1], L"set") == 0) {
-		return SetObjectIL(argv[3], wcstoul(argv[2], NULL, 0), argv[4], argv[5]);
-	}
-	else if (argc == 2 && _wcsicmp(argv[1], L"types") == 0) {
-		wprintf(
+	else if (argc == 5 && _wcsicmp(argv[1], L"set") == 0)
+		return SetObjectIL(argv[3], wcstoul(argv[2], NULL, 0), wcstoul(argv[4], NULL, 0), 0x0);
+	else if (argc == 6 && _wcsicmp(argv[1], L"set") == 0)
+		return SetObjectIL(argv[3], wcstoul(argv[2], NULL, 0), wcstoul(argv[4], NULL, 0), (BYTE)wcstoul(argv[5], NULL, 0));
+	else if (argc == 2 && _wcsicmp(argv[1], L"types") == 0)
+		_putws(
 			L"\nObject types:\n"
 			L"\n0:SE_UNKNOWN_OBJECT_TYPE:\nUnknown object type.\n"
 			L"\n1:SE_FILE_OBJECT:\nIndicates a file or directory. The name string that identifies a file or directory object can be in one of the following formats:\nA relative path, such as FileName.dat or ..\\FileName\nAn absolute path, such as FileName.dat, C:\\DirectoryName\\FileName.dat, or G:\\RemoteDirectoryName\\FileName.dat.\nA UNC name, such as \\\\ComputerName\\ShareName\\FileName.dat.\n"
@@ -130,16 +191,13 @@ int wmain(int argc, wchar_t* argv[]) {
 			L"\n10:SE_PROVIDER_DEFINED_OBJECTI:\nndicates a provider-defined object.\n"
 			L"\n11:SE_WMIGUID_OBJECT:\nIndicates a WMI object.\n"
 			L"\n12:SE_REGISTRY_WOW64_32KEY:\nIndicates an object for a registry entry under WOW64.\n"
-			L"\n13:SE_REGISTRY_WOW64_64KEY\n"
-		);
-		return 0;
-	}
-	else {
-		wprintf(
+			L"\n13:SE_REGISTRY_WOW64_64KEY");
+	else
+		_putws(
 			L"Usage:\n"
 			L"  win_objects_il types\n"
 			L"  win_objects_il get <object_type_num> <object_name>\n"
-			L"  win_objects_il set <object_type_num> <object_name> <LW|ME|MP|HI|SI> [OI|CI|OICI]\n"
+			L"  win_objects_il set <object_type_num> <object_name> <integrity_level> [inheritance]\n"
 			L"Object types:\n"
 			L"  0:SE_UNKNOWN_OBJECT_TYPE"
 			L"  1:SE_FILE_OBJECT\n"
@@ -156,20 +214,18 @@ int wmain(int argc, wchar_t* argv[]) {
 			L"  12:SE_REGISTRY_WOW64_32KEY\n"
 			L"  13:SE_REGISTRY_WOW64_64KEY\n"
 			L"IntegrityLevel:\n"
-			L"  LW (Low)\n"
-			L"  ME (Medium)\n"
-			L"  MP (Medium Plus)\n"
-			L"  HI (High)\n"
-			L"  SI (System)\n"
+			L"  0x00001000 (Low)\n"
+			L"  0x00002000 (Medium)\n"
+			L"  0x00002100 (Medium Plus)\n"
+			L"  0x00003000 (High)\n"
+			L"  0x00004000 (System)\n"
 			L"inheritance: \n"
-			L"  OI  (object inherit)\n"
-			L"  CI  (container inherit)\n"
-			L"  OICI  (container inherit and object inherit)\n"
+			L"  0x1  (object inherit)\n"
+			L"  0x2  (container inherit)\n"
+			L"  0x3  (container inherit and object inherit)\n"
 			L"Examples:\n"
-			L"  win_objects_il set 1 C:\\test.txt ME OICI\n"
-			L"  win_objects_il set 4 CURRENT_USER\\Software\\test LW\n"
-			L"  win_objects_il get 2 Spooler\n"
-		);
-		return 0;
-	}
+			L"  win_objects_il set 1 C:\\test.txt 0x00002000 0x3\n"
+			L"  win_objects_il set 4 CURRENT_USER\\Software\\test 0x00001000 0x1\n"
+			L"  win_objects_il get 2 Spooler");
+	return 0;
 }
